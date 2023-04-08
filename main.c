@@ -1,78 +1,121 @@
 #include <curses.h>
 #include <dirent.h>
+#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+typedef struct Line {
+    int row;
+    int size;
+    char name[128];
+} Line;
+
+typedef struct Lines {
+    Line *lines;
+    int line_count;
+} Lines;
+
+#define MAX_LEN 256
+#define MAX_ROW 4096
+
+void init_curses() {
+    ESCDELAY = 0;
+    if (!initscr())
+        fprintf(stderr, "Error initializing the application\n");
+    keypad(stdscr, TRUE);
+    noecho();
+}
+
+int compare_strings(const void *a, const void *b) {
+    char const *pp1 = a;
+    char const *pp2 = b;
+    return strcmp(pp1, pp2);
+}
+
+void write_lines(Line *lines, int count) {
+    for (int i = 0; i < count; i++) {
+        mvprintw(lines[i].row, 0, "%s", lines[i].name);
+    }
+    mvchgat(0, 0, -1, A_STANDOUT, 1, NULL);
+    move(0, 0);
+}
+
+int get_parent_dir_index(char *path) {
+    int l = strlen(path);
+    for (int i = l; i > 0; i--) {
+        if (path[i] == '/')
+            return i;
+    }
+    return 0;
+}
+
+void get_parent_dir(char *src) { getcwd(src, PATH_MAX); }
+
+void get_files(char *path) {
+    DIR *folder;
+    if ((folder = opendir(path)) == NULL) {
+        fprintf(stderr, "Error reading the folder: %s\n", path);
+        exit(1);
+    }
+    
+    size_t l = 0;
+    size_t max_len = 0;
+    size_t row_count = 0;
+    struct dirent *entry;
+    while ((entry = readdir(folder))) {
+        row_count++;
+        l = strlen(entry->d_name);
+        max_len = max_len > l ? max_len : l;
+    }
+    rewinddir(folder);
+
+    char file_paths[row_count][max_len];
+
+    size_t row = 0;
+    while ((entry = readdir(folder))) {
+        strcpy(file_paths[row++], entry->d_name);
+    }
+    
+    qsort(file_paths, row_count, max_len, compare_strings);
+    for (size_t i=0; i<row_count; i++){
+        printf("%ld:%s\n", i, file_paths[i]); 
+    }
+
+    closedir(folder);
+}
 
 int main() {
 
-    int ch;
-    ESCDELAY = 0;
-    char *lines[256];
-    char *path = malloc(1);
-    path = ".";
-    if (!initscr())
-        fprintf(stderr, "Error initializing curses screen\n");
-    keypad(stdscr, TRUE);
-    noecho();
+    get_files(".");
 
-    DIR *folder;
-    if ((folder = opendir(path)) == NULL) {
-        fprintf(stderr, "Error reading the folder\n");
-        return 1;
-    }
+    // int ch;
+    // int cursor_row = 0;
 
-    int row = 0;
-    int cursor_row = 0;
+    // init_curses();
+    // Lines lines = get_lines(".");
+    // write_lines(lines, row_count);
 
-    struct dirent *entry;
-    while ((entry = readdir(folder))) {
-        lines[row] = malloc(sizeof(strlen(entry->d_name)));
-        lines[row] = entry->d_name;
-        mvprintw(row++, 0, "%s", entry->d_name);
-    }
-    closedir(folder);
+    // for (int i=0; i<lines.line_count; i++) {
+    //     printf("%s\n", lines.lines[i].name);
+    // }
 
-    mvchgat(0, 0, -1, A_STANDOUT, 1, NULL);
-    move(0, 0);
-    while ((ch = getch()) != 27) {
-        mvchgat(cursor_row, 0, -1, A_NORMAL, 1, NULL);
-        if (ch == KEY_UP && cursor_row > 0) {
-            cursor_row -= 1;
-        }
-        if (ch == KEY_DOWN && cursor_row < row - 1) {
-            cursor_row += 1;
-        }
-
-        if (ch == 10) {
-            clear();
-            char *old_path = malloc(sizeof(path));
-            strcpy(old_path, path);
-            path = malloc(strlen(lines[cursor_row] + strlen(path) + 2));
-            strcat(path, old_path);
-            strcat(path, "/");
-            strcat(path, lines[cursor_row]);
-            printf("%s", path);
-            if ((folder = opendir(path))== NULL) {
-                fprintf(stderr, "Error reading the folder\n");
-                return 1;
-            }
-            row = 0;
-
-            while ((entry = readdir(folder))) {
-                lines[row] = malloc(sizeof(strlen(entry->d_name)));
-                lines[row] = entry->d_name;
-                mvprintw(row++, 0, "%s", entry->d_name);
-            }
-            closedir(folder);
-        }
-
-        mvchgat(cursor_row, 0, -1, A_STANDOUT, 1, NULL);
-        move(cursor_row, 0);
-        refresh();
-    }
-
-    endwin();
+    // while ((ch = getch()) != 27) {
+    //     mvchgat(cursor_row, 0, -1, A_NORMAL, 1, NULL);
+    //     if (ch == KEY_UP && cursor_row > 0) {
+    //         cursor_row -= 1;
+    //     }
+    //     if (ch == KEY_DOWN && cursor_row < row_count - 1) {
+    //         cursor_row += 1;
+    //     }
+    //
+    //     mvchgat(cursor_row, 0, -1, A_STANDOUT, 1, NULL);
+    //     move(cursor_row, 0);
+    //     refresh();
+    // }
+    //
+    // endwin();
 
     return 0;
 }
