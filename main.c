@@ -13,12 +13,9 @@ typedef struct Line {
 } Line;
 
 typedef struct Lines {
-    Line *lines;
-    int line_count;
+    int row_count;
+    Line lines[128];
 } Lines;
-
-#define MAX_LEN 256
-#define MAX_ROW 4096
 
 void init_curses() {
     ESCDELAY = 0;
@@ -42,24 +39,13 @@ void write_lines(Line *lines, int count) {
     move(0, 0);
 }
 
-int get_parent_dir_index(char *path) {
-    int l = strlen(path);
-    for (int i = l; i > 0; i--) {
-        if (path[i] == '/')
-            return i;
-    }
-    return 0;
-}
-
-void get_parent_dir(char *src) { getcwd(src, PATH_MAX); }
-
 void get_files(char *path) {
     DIR *folder;
     if ((folder = opendir(path)) == NULL) {
         fprintf(stderr, "Error reading the folder: %s\n", path);
         exit(1);
     }
-    
+
     size_t l = 0;
     size_t max_len = 0;
     size_t row_count = 0;
@@ -77,18 +63,37 @@ void get_files(char *path) {
     while ((entry = readdir(folder))) {
         strcpy(file_paths[row++], entry->d_name);
     }
-    
+
     qsort(file_paths, row_count, max_len, compare_strings);
-    for (size_t i=0; i<row_count; i++){
-        printf("%ld:%s\n", i, file_paths[i]); 
+
+    for (size_t i = 0; i < row_count; i++) {
+        printf("%s\n", file_paths[i]);
     }
 
     closedir(folder);
 }
 
+void cut_path(char *path, char *new_path) {
+    size_t l = strlen(path);
+    size_t cut_index;
+    for (size_t i = l; i > 0; i--) {
+        if (path[i] == '/') {
+            cut_index = i;
+            break;
+        }
+    }
+    strncpy(new_path, path, cut_index);
+}
+
 int main() {
 
     get_files(".");
+    char old_path[128];
+    char new_path[128];
+    getcwd(old_path, 128);
+
+    // cut_path(full_path, new_path);
+    // printf("%s\n", new_path);
 
     // int ch;
     // int cursor_row = 0;
